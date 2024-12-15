@@ -78,6 +78,49 @@ const deleteHelper = async (req, res) => {
     res.status(500).json({ message: "Error deleting helper", error: err });
   }
 };
+const getHelperDashboard = async (req, res) => {
+  try {
+    const helperId = req.user.id; // Assuming authenticated user
+    const completedTasks = await Booking.find({ helperId, status: "completed" }).countDocuments();
+    const earnings = await Booking.aggregate([
+      { $match: { helperId, status: "completed" } },
+      { $group: { _id: null, totalEarnings: { $sum: "$salary" } } },
+    ]);
+
+    const upcomingServices = await Booking.find({ helperId, status: "pending" });
+    const todayServices = await Booking.find({
+      helperId,
+      date: { $gte: new Date().setHours(0, 0, 0, 0), $lt: new Date().setHours(23, 59, 59, 999) },
+    });
+
+    res.status(200).json({
+      totalEarnings: earnings[0]?.totalEarnings || 0,
+      totalServicesDone: completedTasks,
+      upcomingServices,
+      todayServices,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching dashboard data", error: err });
+  }
+};
+const markTaskAsCompleted = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = await Booking.findById(taskId);
+
+    if (!task || task.status !== "ongoing") {
+      return res.status(400).json({ message: "Invalid task or status" });
+    }
+
+    task.status = "completed";
+    await task.save();
+    res.status(200).json({ message: "Task marked as completed" });
+  } catch (err) {
+    res.status(500).json({ message: "Error marking task as completed", error: err });
+  }
+};
+
+
 
 module.exports = {
   getAllHelper,
@@ -85,4 +128,6 @@ module.exports = {
   createHelper,
   updateHelper,
   deleteHelper,
+  getHelperDashboard,
+  markTaskAsCompleted,
 };
