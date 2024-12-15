@@ -47,7 +47,7 @@ const jobPostingSchema = new mongoose.Schema({
   },
   contractType: {
     type: String,
-    enum: ["Part-time", "Full-time", "Contract"],
+    enum: ["Part-time", "Full-time"],
     required: true,
   },
   applicationDeadline: {
