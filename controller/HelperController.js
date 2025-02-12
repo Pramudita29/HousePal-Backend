@@ -1,5 +1,9 @@
 const Helper = require("../model/Helper");
+const Booking = require("../model/Booking");
+const fs = require("fs");
+const path = require("path");
 
+// Get all helpers
 const getAllHelper = async (req, res) => {
   try {
     const helpers = await Helper.find().sort({ createdAt: -1 });
@@ -20,51 +24,48 @@ const getHelperById = async (req, res) => {
   }
 };
 
-// Create a new helper
-const createHelper = async (req, res) => {
+// Update an existing helper profile with image upload (and old image deletion)
+const updateHelperProfile = async (req, res) => {
   try {
-    const { full_name, email, contact_no, skills, experience, availability } = req.body;
-    const profileImage = req.file ? req.file.path : "";
+    const { id } = req.params;
+    const updates = req.body;
 
-    const newHelper = new Helper({
-      full_name,
-      email,
-      contact_no,
-      skills,
-      experience,
-      availability,
-      profile_picture: profileImage,
-    });
-
-    await newHelper.save();
-    res.status(201).json(newHelper);
-  } catch (err) {
-    res.status(400).json({ message: "Error creating helper", error: err });
-  }
-};
-
-// Update an existing helper
-const updateHelper = async (req, res) => {
-  try {
-    // If a new profile image is uploaded, handle it
-    const profileImage = req.file ? req.file.path : undefined;
-
-    // Prepare the update data
-    const updateData = { ...req.body };
-    if (profileImage) {
-      updateData.profile_image = profileImage; // Update the profile_image field with new image path
+    // Ensure required fields are provided (e.g., name or contact)
+    if (!updates.name && !updates.contactNo) {
+      return res.status(400).json({ message: "Name or Contact number must be provided." });
     }
 
-    // Update the helper document
-    const updatedHelper = await Helper.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    // Handle image upload
+    if (req.file) {
+      updates.image = req.file.path; // Save image path to updates
 
-    if (!updatedHelper) return res.status(404).json({ message: "Helper not found" });
-    res.status(200).json(updatedHelper);
-  } catch (err) {
-    res.status(400).json({ message: "Error updating helper", error: err });
+      // Delete old image if exists
+      const oldHelper = await Helper.findById(id);
+      if (oldHelper && oldHelper.image) {
+        const oldImagePath = path.join(__dirname, "..", oldHelper.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath); // Remove the old image file
+        }
+      }
+    }
+
+    const updatedHelper = await Helper.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedHelper) {
+      return res.status(404).json({ message: "Helper not found" });
+    }
+
+    res.status(200).json({
+      message: "Helper profile updated successfully",
+      data: updatedHelper,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -73,11 +74,22 @@ const deleteHelper = async (req, res) => {
   try {
     const deletedHelper = await Helper.findByIdAndDelete(req.params.id);
     if (!deletedHelper) return res.status(404).json({ message: "Helper not found" });
+
+    // Optionally, delete the profile image from the server
+    if (deletedHelper.image) {
+      const imagePath = path.join(__dirname, "..", deletedHelper.image);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath); // Delete the image file from server
+      }
+    }
+
     res.status(200).json({ message: "Helper deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting helper", error: err });
   }
 };
+
+// Get helper dashboard data
 const getHelperDashboard = async (req, res) => {
   try {
     const helperId = req.user.id; // Assuming authenticated user
@@ -103,6 +115,8 @@ const getHelperDashboard = async (req, res) => {
     res.status(500).json({ message: "Error fetching dashboard data", error: err });
   }
 };
+
+// Mark a task as completed
 const markTaskAsCompleted = async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -120,14 +134,53 @@ const markTaskAsCompleted = async (req, res) => {
   }
 };
 
+const imageUpload = async (req, res) => {
+  try {
+    // Ensure a file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Extract the image path (ensure it's relative, not full path)
+    const imagePath = req.file.path;  // Should be relative path (e.g., 'uploads/images/filename.jpg')
+
+    const { email } = req.body;
+
+    // Find the helper by email
+    const helper = await Helper.findOne({ email });
+
+    if (!helper) {
+      return res.status(404).json({ error: "Helper not found" });
+    }
+
+    // Update the helper's image path in the database (storing relative path)
+    helper.image = imagePath;
+
+    // Save the updated helper record
+    await helper.save();
+
+    // Construct the full URL for the image (e.g., 'http://yourserver.com/uploads/images/filename.jpg')
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${imagePath.split('/').pop()}`;
+
+    // Send the response with the image URL
+    res.status(200).json({
+      message: 'Image uploaded successfully',
+      imageUrl: imageUrl,  // Full URL to the uploaded image
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+};
+
 
 
 module.exports = {
   getAllHelper,
   getHelperById,
-  createHelper,
-  updateHelper,
+  updateHelperProfile,
   deleteHelper,
   getHelperDashboard,
   markTaskAsCompleted,
+  imageUpload
 };

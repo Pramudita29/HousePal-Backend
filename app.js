@@ -20,7 +20,6 @@ app.use("/api/helper", HelperRoute);
 app.use("/api/jobPosting", JobPostingRoute);
 app.use("/api/Booking", BookingRoute);
 app.use("/api/FeedbackRoute",FeedbackRoute)
-
 app.use("/api/auth",AuthRouter)
 
 

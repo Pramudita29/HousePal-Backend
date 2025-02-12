@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const credSchema = new mongoose.Schema({
-  username: {
+  email: {
     type: String,
     required: true,
     unique: true, // Ensures the username is unique
@@ -13,7 +13,7 @@ const credSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['seeker', 'helper', 'admin'], // Restricts to valid roles
+    enum: ['Seeker', 'Helper', 'Admin'], // Restricts to valid roles
   },
 });
 

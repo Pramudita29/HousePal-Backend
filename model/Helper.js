@@ -1,12 +1,8 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const helperSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  full_name: {
+  fullName: {
     type: String,
     required: true,
   },
@@ -19,7 +15,7 @@ const helperSchema = new mongoose.Schema({
       message: "Invalid email format.",
     },
   },
-  contact_no: {
+  contactNo: {
     type: String,
     required: true,
     validate: {
@@ -27,12 +23,18 @@ const helperSchema = new mongoose.Schema({
       message: "Contact number must be 10 digits.",
     },
   },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6,  // Enforcing a minimum length for security
+  },
+
   skills: {
     type: [String],
     required: true,
   },
   experience: {
-    type: Number,
+    type: String,
     min: 0,
     required: true,
   },
@@ -47,11 +49,31 @@ const helperSchema = new mongoose.Schema({
     max: 5,
     default: 0,
   },
-  profile_picture: {
+  image: {
     type: String,
     default: "",
   },
+  totalEarnings: {
+    type: Number,
+    default: 0,
+  },
+  notifications: [
+    {
+      message: String,
+      isRead: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
 }, { timestamps: true });
+
+// Pre-save hook to hash password before saving
+helperSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  next();
+});
+
 
 const Helper = mongoose.models.Helper || mongoose.model("Helper", helperSchema);
 module.exports = Helper;
