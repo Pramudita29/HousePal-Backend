@@ -1,62 +1,73 @@
-const Helper = require("../model/Helper");
-const Seeker = require("../model/Seeker");
+const Notification = require('../model/Notification');
+const Helper = require('../model/Helper');
+const Seeker = require('../model/Seeker');
 
-// Add a notification for a user (helper or seeker)
-const addNotification = async (userId, userType, message) => {
-  try {
-    const Model = userType === "helper" ? Helper : Seeker;
+const addNotification = async (recipientEmail, recipientType, title, message, jobId) => {
+    try {
+        const recipient = recipientType === 'Helper'
+            ? await Helper.findOne({ email: recipientEmail })
+            : await Seeker.findOne({ email: recipientEmail });
 
-    const user = await Model.findById(userId);
-    if (!user) throw new Error("User not found");
+        if (!recipient) {
+            throw new Error(`Recipient not found for email: ${recipientEmail}`);
+        }
 
-    user.notifications.push({ message });
-    await user.save();
-    return { success: true, message: "Notification added successfully" };
-  } catch (err) {
-    throw new Error(`Error adding notification: ${err.message}`);
-  }
+        const notification = new Notification({
+            recipientEmail,
+            recipientType,
+            title,
+            message,
+            jobId, // Include jobId in the notification
+        });
+
+        await notification.save();
+        console.log(`Notification saved for recipientEmail ${recipientEmail}: ${title} - ${message}`);
+    } catch (error) {
+        console.error(`Error saving notification for recipientEmail ${recipientEmail}:`, error);
+        throw error;
+    }
 };
 
-// Get all notifications for a user
 const getNotifications = async (req, res) => {
-  try {
-    const userId = req.user.id; // Authenticated user's ID
-    const userType = req.user.role; // Either 'helper' or 'seeker'
-    const Model = userType === "helper" ? Helper : Seeker;
+    try {
+        const user = req.user; // Assuming req.user is set by authenticateToken middleware
+        console.log('User:', user);
 
-    const user = await Model.findById(userId).select("notifications");
-    if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user.email) {
+            console.error('User email is missing');
+            return res.status(400).json({ message: 'User email is missing' });
+        }
 
-    res.status(200).json(user.notifications);
-  } catch (err) {
-    res.status(500).json({ message: "Error fetching notifications", error: err.message });
-  }
+        const notifications = await Notification.find({ recipientEmail: user.email })
+            .sort({ createdAt: -1 });
+
+        console.log('Notifications:', notifications);
+
+        res.status(200).json(notifications);
+    } catch (err) {
+        console.error("Error fetching notifications:", err);
+        res.status(500).json({ message: "Error fetching notifications", error: err });
+    }
 };
 
-// Mark all notifications as read for a user
 const markAllNotificationsAsRead = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const userType = req.user.role; // Either 'helper' or 'seeker'
-    const Model = userType === "helper" ? Helper : Seeker;
+    try {
+        const userEmail = req.user.email; // Assuming the email is stored in req.user.email
 
-    const user = await Model.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+        await Notification.updateMany(
+            { recipientEmail: userEmail },
+            { $set: { isRead: true } }
+        );
 
-    user.notifications.forEach((notification) => {
-      notification.isRead = true;
-    });
-    await user.save();
-
-    res.status(200).json({ message: "All notifications marked as read" });
-  } catch (err) {
-    res.status(500).json({ message: "Error marking notifications", error: err.message });
-  }
+        res.status(200).json({ message: 'All notifications marked as read' });
+    } catch (err) {
+        console.error(`Error marking notifications as read for user ${req.user.email}:`, err);
+        res.status(500).json({ message: 'Error marking notifications', error: err.message });
+    }
 };
 
-// Export the notification functions
 module.exports = {
-  addNotification,
-  getNotifications,
-  markAllNotificationsAsRead,
+    addNotification,
+    getNotifications,
+    markAllNotificationsAsRead,
 };

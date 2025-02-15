@@ -1,4 +1,6 @@
 const Seeker = require("../model/Seeker");
+const Job = require("../model/Job");
+const JobApplication = require("../model/JobApplication");
 const fs = require("fs");
 const path = require("path");
 
@@ -12,14 +14,14 @@ const getAllSeeker = async (req, res) => {
   }
 };
 
-// Get a single seeker by ID
 const getSeekerById = async (req, res) => {
   try {
     const seeker = await Seeker.findById(req.params.id);
     if (!seeker) return res.status(404).json({ message: "Seeker not found" });
     res.status(200).json(seeker);
   } catch (err) {
-    res.status(500).json({ message: "Error retrieving seeker", error: err });
+    console.error("Error retrieving seeker:", err);
+    res.status(500).json({ message: "Error retrieving seeker", error: err.message });
   }
 };
 
@@ -139,7 +141,43 @@ const getCurrentSeeker = async (req, res) => {
   }
 };
 
+const getAllApplications = async (req, res) => {
+  try {
+    console.log("Fetching all applications for seeker email:", req.user.email);
 
+    if (!req.user.email) {
+      console.log("No email provided in token");
+      return res.status(401).json({ message: "Authentication error: No email in token" });
+    }
+
+    const jobs = await Job.find({ posterEmail: req.user.email });
+    console.log("Jobs posted by seeker:", jobs);
+
+    if (!jobs.length) {
+      console.log("No jobs found for seeker:", req.user.email);
+      return res.status(200).json([]);
+    }
+
+    const jobIds = jobs.map(job => new mongoose.Types.ObjectId(job._id));
+    console.log("Job IDs:", jobIds);
+
+    const applications = await JobApplication.find({ jobId: { $in: jobIds } })
+      .populate({
+        path: 'jobId',
+        select: 'jobTitle jobDescription category subCategory location salaryRange contractType applicationDeadline'
+      })
+      .sort({ createdAt: -1 });
+    console.log("All applications retrieved:", applications);
+
+    res.status(200).json(applications);
+  } catch (err) {
+    console.error("Error retrieving all applications:", err.stack);
+    res.status(500).json({ message: "Server error fetching applications", error: err.message });
+  }
+};
+
+
+// Export all functions correctly
 module.exports = {
   getAllSeeker,
   getSeekerById,
@@ -147,4 +185,5 @@ module.exports = {
   deleteSeeker,
   imageUpload,
   getCurrentSeeker,
+  getAllApplications,
 };
