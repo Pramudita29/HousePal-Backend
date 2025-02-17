@@ -13,7 +13,7 @@ const credSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['Seeker', 'Helper', 'Admin'], // Restricts to valid roles
+    enum: ['Seeker', 'Helper'], // Restricts to valid roles
   },
 });
 
