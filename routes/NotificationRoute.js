@@ -1,31 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const {
-  getNotifications,
-  markAllNotificationsAsRead,
-} = require("../controller/NotificationController");
-const authenticate = require("../security/auth"); // Import authentication functions from auth.js
+const { getNotifications, markAllNotificationsAsRead, addNotification } = require("../controller/NotificationController");
+const { authenticateToken } = require("../security/auth");
 
-// Route to get all notifications
-// This route is protected by the authenticateToken middleware
-router.get("/", authenticate.authenticateToken, async (req, res) => {
-  try {
-    // Call the controller function to get notifications
-    await getNotifications(req, res);
-  } catch (error) {
-    res.status(500).send("Error fetching notifications");
-  }
-});
-
-// Route to mark all notifications as read
-// This route is also protected by the authenticateToken middleware
-router.patch("/mark-all-as-read", authenticate.authenticateToken, async (req, res) => {
-  try {
-    // Call the controller function to mark all notifications as read
-    await markAllNotificationsAsRead(req, res);
-  } catch (error) {
-    res.status(500).send("Error marking notifications as read");
-  }
+router.get("/", authenticateToken, getNotifications);
+router.patch("/mark-all-as-read", authenticateToken, markAllNotificationsAsRead);
+router.post("/add", authenticateToken, async (req, res) => {
+    try {
+        const { recipientEmail, recipientType, title, message, type, jobId } = req.body;
+        await addNotification(recipientEmail, recipientType, title, message, type, jobId);
+        res.status(201).json({ message: 'Notification added successfully' });
+    } catch (error) {
+        console.error('Error adding notification:', error);
+        res.status(500).json({ message: 'Error adding notification', error: error.message });
+    }
 });
 
 module.exports = router;
