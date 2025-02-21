@@ -1,12 +1,12 @@
 const express = require("express");
-const { login, register, getCurrentUser } = require("../controller/AuthController");
+const router = express.Router();
+const { login, register, getCurrentUser, getMe, updateProfile } = require("../controller/AuthController");
 const { authenticateToken } = require("../security/auth");
 
-const router = express.Router();
-
-// Authentication Routes
-router.post("/login", login);       // Login route
-router.post("/register", register); // Register route
-router.get("/current", authenticateToken, getCurrentUser); // Get current authenticated user
+router.post("/login", login);
+router.post("/register", register);
+router.get("/user", authenticateToken, getCurrentUser);
+router.get("/me", authenticateToken, getMe); // New endpoint
+router.put("/update", authenticateToken, updateProfile);
 
 module.exports = router;
