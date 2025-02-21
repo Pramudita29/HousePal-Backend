@@ -1,70 +1,53 @@
 const express = require("express");
 const router = express.Router();
 const {
-    getAllHelper,
-    getHelperById,
-    updateHelperProfile,
-    deleteHelper,
-    markTaskAsCompleted,
-    getHelperDashboard,
-    imageUpload, 
+  getAllHelper,
+  getHelperById,
+  updateHelperProfile,
+  deleteHelper,
+  markTaskAsCompleted,
+  getHelperDashboard,
+  imageUpload,
+  getSavedJobs,
+  saveJob,
+  removeSavedJob,
+  getRecommendedJobs,
+  getApplicationHistory,
 } = require("../controller/HelperController");
-
-const HelperValidation = require("../validation/HelperValidation");
-const { authenticateToken, authorizeRole } = require("../security/auth"); // Security middleware
+const { authenticateToken, authorizeRole } = require("../security/auth");
 const multer = require("multer");
+const fs = require("fs"); // Added missing import
+const path = require("path"); // Ensure path is imported (already present in your controller)
 
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'images');
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.originalname);
+  destination: function (req, file, cb) {
+    const dir = 'images';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
     }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
 });
-
 const upload = multer({ storage: storage });
 
-// Define routes
+// Specific routes first
+router.get("/saved-jobs", authenticateToken, authorizeRole("helper"), getSavedJobs);
+router.post("/saved-jobs/:jobId", authenticateToken, authorizeRole("helper"), saveJob);
+router.delete("/saved-jobs/:jobId", authenticateToken, authorizeRole("helper"), removeSavedJob);
+router.get("/recommended-jobs", authenticateToken, authorizeRole("helper"), getRecommendedJobs);
+router.get("/application-history", authenticateToken, authorizeRole("helper"), getApplicationHistory);
+router.get("/dashboard", authenticateToken, authorizeRole("helper"), getHelperDashboard);
+router.post("/uploadImage", upload.single("image"), imageUpload);
+router.patch("/task/:taskId/complete", authenticateToken, authorizeRole("helper"), markTaskAsCompleted);
+
+// General routes after specific ones
 router.get("/", getAllHelper);
 router.get("/:id", getHelperById);
-
-// POST route with image upload (optional) for creating a helper
-router.post("/", upload.single("image"), HelperValidation, async (req, res) => {
-    try {
-        // If file exists, handle the file path logic here
-        if (req.file) {
-            req.body.image = req.file.path; // Add the image path to the body for saving
-        }
-        // Proceed to helper creation logic here (not implemented in controller)
-        res.status(201).json({ message: "Helper created successfully", data: req.body });
-    } catch (err) {
-        res.status(500).json({ message: "Error creating helper", error: err });
-    }
-});
-
-// PUT route for updating the helper's profile (with image upload handling)
-router.put(
-    "/:id",
-    authenticateToken,
-    authorizeRole("helper"),
-    upload.single("image"),  // Image upload
-    HelperValidation,  // Custom validation for updating helper
-    updateHelperProfile
-);
-
-// DELETE route for deleting a helper
-router.delete("/:id", deleteHelper);
-
-// PATCH route for marking a task as completed
-router.patch("/task/:taskId/complete", markTaskAsCompleted);
-
-// Route for fetching the helper's dashboard data
-router.get("/dashboard", getHelperDashboard);
-
-// New route for uploading the profile image separately
-router.post("/uploadImage", upload.single("image"), imageUpload); // Use imageUpload function here
-
-
+router.put("/:id", authenticateToken, authorizeRole("helper"), upload.single("image"), updateHelperProfile);
+router.delete("/:id", authenticateToken, authorizeRole("helper"), deleteHelper);
 
 module.exports = router;
